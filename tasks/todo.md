@@ -16,8 +16,9 @@ Skapa en statisk webbsida (HTML5, JS, CSS) som ansluter till en MQTT-broker via 
 - [x] Skapa `index.html` med struktur för UI
 - [x] Skapa `styles.css` med modernt mörkt tema
 - [x] Skapa `app.js` med MQTT-anslutningslogik (Paho-klient)
+- [x] Optimera meddelandevy (kompakt design, rensa-knapp i header)
 - [x] Verifiera att webbsidan fungerar i webbläsare (server på http://localhost:8080)
-- [ ] Testa MQTT-anslutning till brokern
+- [x] Testa MQTT-anslutning till brokern (Verifierat med Debug-läge)
 
 ---
 

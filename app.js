@@ -23,12 +23,23 @@ const elements = {
     connectionStatus: document.getElementById('connectionStatus'),
     messagesContainer: document.getElementById('messagesContainer'),
     emptyState: document.getElementById('emptyState'),
-    messageCount: document.getElementById('messageCount')
+    messageCount: document.getElementById('messageCount'),
+    // Sensor Dashboard
+    sensorGrid: document.getElementById('sensorGrid'),
+    emptySensors: document.getElementById('emptySensors'),
+    sensorCount: document.getElementById('sensorCount'),
+    motionCount: document.getElementById('motionCount'),
+    personCount: document.getElementById('personCount')
 };
 
 // State
 let client = null;
 let messageCounter = 0;
+
+// Sensor State Tracking
+const sensorState = {};
+let totalMotionEvents = 0;
+let totalPersonDetections = 0;
 
 /**
  * Initialize the application
@@ -38,8 +49,55 @@ function init() {
     elements.disconnectBtn.addEventListener('click', disconnect);
     elements.clearBtn.addEventListener('click', clearMessages);
 
+    // Debug helper
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('debug')) {
+        createDebugControls();
+    }
+
     console.log('GS Retail MQTT Monitor initialized');
     console.log('Client ID:', MQTT_CONFIG.clientId);
+}
+
+/**
+ * Create debug controls
+ */
+function createDebugControls() {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary';
+    btn.style.marginLeft = '1rem';
+    btn.innerHTML = '🔧 Simulera Data';
+    btn.onclick = simulateMessage;
+
+    document.querySelector('.button-group').appendChild(btn);
+    addSystemMessage('Debug-läge aktiverat. Klicka på "Simulera Data" för att testa UI.', 'info');
+}
+
+/**
+ * Simulate an incoming MQTT message
+ */
+function simulateMessage() {
+    const isError = Math.random() > 0.8;
+    const isActive = Math.random() > 0.5;
+
+    const mockData = {
+        UtcTime: new Date().toISOString(),
+        Source: {
+            Source: "VideoSourceToken-" + Math.floor(Math.random() * 5),
+            Name: "Entrance Camera " + Math.floor(Math.random() * 5)
+        },
+        Data: {
+            State: isActive,
+            Motion: Math.random() * 100
+        }
+    };
+
+    const message = {
+        destinationName: 'gs-retail/sensor/onvif-ej/VideoSource/MotionAlarm',
+        payloadString: JSON.stringify(mockData)
+    };
+
+    onMessageArrived(message);
 }
 
 /**
@@ -150,6 +208,9 @@ function onMessageArrived(message) {
     if (elements.emptyState) {
         elements.emptyState.style.display = 'none';
     }
+
+    // Process sensor event for dashboard
+    processSensorEvent(message);
 
     // Create message card
     const messageCard = createMessageCard(message);
@@ -338,6 +399,225 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ========================================
+// Sensor Dashboard Functions
+// ========================================
+
+/**
+ * Process sensor event and update dashboard
+ * @param {Object} message - MQTT message object
+ */
+function processSensorEvent(message) {
+    const topic = message.destinationName;
+    let payload;
+
+    try {
+        payload = JSON.parse(message.payloadString);
+    } catch (e) {
+        return; // Not JSON, skip
+    }
+
+    // Extract sensor ID from topic or payload
+    const sensorId = extractSensorId(topic, payload);
+    if (!sensorId) return;
+
+    // Parse event type from topic
+    const eventInfo = parseEventType(topic);
+
+    // Initialize sensor if new
+    if (!sensorState[sensorId]) {
+        sensorState[sensorId] = {
+            id: sensorId,
+            motionAlarm: false,
+            motionEvents: 0,
+            motionDetection: false,
+            personCount: 0,
+            lastPersonTime: null,
+            lastActivity: new Date(),
+            isActive: false
+        };
+        // Hide empty state
+        if (elements.emptySensors) {
+            elements.emptySensors.style.display = 'none';
+        }
+    }
+
+    const sensor = sensorState[sensorId];
+    sensor.lastActivity = new Date();
+
+    // Update sensor based on event type
+    if (eventInfo.type === 'MotionAlarm') {
+        const state = payload.Data?.State;
+        sensor.motionAlarm = state === true || state === 'true';
+        sensor.isActive = sensor.motionAlarm;
+        if (sensor.motionAlarm) {
+            sensor.motionEvents++;
+            totalMotionEvents++;
+        }
+    } else if (eventInfo.type === 'MotionDetection') {
+        const motion = payload.Data?.Motion;
+        sensor.motionDetection = motion === '1' || motion === 1 || motion === true;
+        sensor.isActive = sensor.motionDetection || sensor.motionAlarm;
+    } else if (eventInfo.type === 'ObjectDetection') {
+        const classType = payload.Data?.ClassTypes;
+        if (classType === 'Person') {
+            sensor.personCount++;
+            sensor.lastPersonTime = new Date();
+            totalPersonDetections++;
+        }
+    }
+
+    // Update UI
+    updateSensorCard(sensor);
+    updateGlobalStats();
+}
+
+/**
+ * Extract sensor ID from topic and payload
+ */
+function extractSensorId(topic, payload) {
+    // Try to get from Source field
+    if (payload.Source) {
+        if (payload.Source.Source) return payload.Source.Source;
+        if (payload.Source.VideoSource) return payload.Source.VideoSource;
+    }
+
+    // Try to extract from topic (format: .../&VideoSourceToken-X...)
+    const match = topic.match(/VideoSourceToken-\d+/);
+    return match ? match[0] : null;
+}
+
+/**
+ * Parse event type from MQTT topic
+ */
+function parseEventType(topic) {
+    const parts = topic.split('/');
+
+    if (topic.includes('MotionAlarm')) {
+        return { type: 'MotionAlarm', category: 'motion' };
+    } else if (topic.includes('MotionDetection')) {
+        return { type: 'MotionDetection', category: 'motion' };
+    } else if (topic.includes('ObjectDetection')) {
+        return { type: 'ObjectDetection', category: 'ai' };
+    }
+
+    return { type: parts[parts.length - 1] || 'Unknown', category: 'other' };
+}
+
+/**
+ * Update or create sensor card in dashboard
+ */
+function updateSensorCard(sensor) {
+    let card = document.getElementById(`sensor-${sensor.id}`);
+
+    if (!card) {
+        card = createSensorCard(sensor);
+        elements.sensorGrid.appendChild(card);
+    }
+
+    // Update card content
+    const statusEl = card.querySelector('.sensor-status');
+    const motionEventsEl = card.querySelector('.motion-events-value');
+    const motionBarEl = card.querySelector('.motion-bar-fill');
+    const personRowEl = card.querySelector('.person-row');
+    const personValueEl = card.querySelector('.person-value');
+    const lastActivityEl = card.querySelector('.last-activity-time');
+
+    // Update active state
+    if (sensor.isActive) {
+        card.classList.add('active');
+        statusEl.classList.add('active');
+        statusEl.classList.remove('inactive');
+        statusEl.innerHTML = '<span class="status-pulse"></span> AKTIV';
+    } else {
+        card.classList.remove('active');
+        statusEl.classList.remove('active');
+        statusEl.classList.add('inactive');
+        statusEl.innerHTML = '<span class="status-pulse"></span> INAKTIV';
+    }
+
+    // Update motion events
+    motionEventsEl.textContent = sensor.motionEvents;
+
+    // Update motion bar (max 50 events for full bar)
+    const barWidth = Math.min((sensor.motionEvents / 50) * 100, 100);
+    motionBarEl.style.width = `${barWidth}%`;
+
+    // Update person detection
+    if (sensor.personCount > 0) {
+        personRowEl.classList.add('person-detected');
+        personValueEl.textContent = `${sensor.personCount} detekterade`;
+    }
+
+    // Update last activity
+    lastActivityEl.textContent = sensor.lastActivity.toLocaleTimeString('sv-SE');
+
+    // Trigger pulse animation
+    card.classList.remove('pulse');
+    void card.offsetWidth; // Force reflow
+    card.classList.add('pulse');
+}
+
+/**
+ * Create sensor card element
+ */
+function createSensorCard(sensor) {
+    const card = document.createElement('div');
+    card.className = 'sensor-card';
+    card.id = `sensor-${sensor.id}`;
+
+    card.innerHTML = `
+        <div class="sensor-header">
+            <div class="sensor-name">
+                <span class="icon">📹</span>
+                <span>${escapeHtml(sensor.id)}</span>
+            </div>
+            <div class="sensor-status inactive">
+                <span class="status-pulse"></span>
+                INAKTIV
+            </div>
+        </div>
+        <div class="sensor-metrics">
+            <div class="metric-row">
+                <span class="metric-icon">🎯</span>
+                <span class="metric-label">Motion Events</span>
+                <div class="motion-bar">
+                    <div class="motion-bar-fill" style="width: 0%"></div>
+                </div>
+                <span class="metric-value motion-events-value">0</span>
+            </div>
+            <div class="metric-row">
+                <span class="metric-icon">📡</span>
+                <span class="metric-label">Motion Detection</span>
+                <span class="metric-value">${sensor.motionDetection ? 'Aktiv' : 'Inaktiv'}</span>
+            </div>
+            <div class="metric-row person-row">
+                <span class="metric-icon">👤</span>
+                <span class="metric-label">Person Detection</span>
+                <span class="metric-value person-value">0 detekterade</span>
+            </div>
+        </div>
+        <div class="sensor-footer">
+            <div class="last-activity">
+                <span>Senast aktiv:</span>
+                <span class="last-activity-time">${sensor.lastActivity.toLocaleTimeString('sv-SE')}</span>
+            </div>
+        </div>
+    `;
+
+    return card;
+}
+
+/**
+ * Update global statistics
+ */
+function updateGlobalStats() {
+    const sensorCount = Object.keys(sensorState).length;
+    elements.sensorCount.textContent = sensorCount;
+    elements.motionCount.textContent = totalMotionEvents;
+    elements.personCount.textContent = totalPersonDetections;
 }
 
 // Initialize on DOM ready

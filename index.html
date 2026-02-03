@@ -1,1 +1,126 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="GS Retail MQTT Sensor Monitor - Real-time sensor data visualization">
+    <title>GS Retail | MQTT Sensor Monitor</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+                <span class="logo-text">GS Retail</span>
+            </div>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot"></span>
+                <span class="status-text">Frånkopplad</span>
+            </div>
+        </header>
 
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Connection Panel -->
+            <section class="panel connection-panel">
+                <div class="panel-header">
+                    <h2>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                            <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                            <circle cx="12" cy="20" r="1"/>
+                        </svg>
+                        MQTT Anslutning
+                    </h2>
+                </div>
+                <div class="panel-body">
+                    <div class="connection-info">
+                        <div class="info-row">
+                            <span class="info-label">Broker:</span>
+                            <span class="info-value" id="brokerInfo">wss://mqtt.swedeniot.se:9001/ws</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Topic:</span>
+                            <span class="info-value topic-badge">gs-retail/sensor/onvif-ej/#</span>
+                        </div>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn btn-primary" id="connectBtn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M5 12h14"/>
+                                <path d="M12 5l7 7-7 7"/>
+                            </svg>
+                            Anslut
+                        </button>
+                        <button class="btn btn-secondary" id="disconnectBtn" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                            Koppla från
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Messages Panel -->
+            <section class="panel messages-panel">
+                <div class="panel-header">
+                    <h2>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        Meddelanden
+                    </h2>
+                    <div class="message-counter">
+                        <span id="messageCount">0</span> meddelanden
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="messages-container" id="messagesContainer">
+                        <div class="empty-state" id="emptyState">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                <path d="M8 10h.01"/>
+                                <path d="M12 10h.01"/>
+                                <path d="M16 10h.01"/>
+                            </svg>
+                            <p>Inga meddelanden ännu</p>
+                            <span>Anslut till brokern för att börja ta emot data</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-ghost" id="clearBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                        Rensa meddelanden
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>GS Retail Sensor Monitor &copy; 2026</p>
+        </footer>
+    </div>
+
+    <!-- Paho MQTT Client -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

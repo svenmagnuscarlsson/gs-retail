@@ -16,6 +16,7 @@ Desktop.ini
 
 # Databases
 *.sqlite
+*.db
 
 # Logs
 logs

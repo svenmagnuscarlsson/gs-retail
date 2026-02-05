@@ -1,169 +1,226 @@
 <!DOCTYPE html>
-<html lang="sv">
+<html class="dark" lang="sv">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="GS Retail People Counting Dashboard - Analytics and Real-time Monitoring">
-    <title>GS Retail | People Counting Dashboard</title>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>GS Retail | Analytics Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#00F2FE",
+                        "background-light": "#F8FAFC",
+                        "background-dark": "#0B0E14",
+                        "card-dark": "#161B22",
+                        "accent-green": "#10B981",
+                        "accent-red": "#EF4444",
+                        "accent-purple": "#8B5CF6"
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"],
+                        display: ["Inter", "sans-serif"],
+                        mono: ["JetBrains Mono", "monospace"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "12px",
+                    },
+                },
+            },
+        };
+    </script>
     <link rel="stylesheet" href="styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
-<body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="header">
-            <div class="logo">
-                <div class="logo-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                        <path d="M2 17l10 5 10-5" />
-                        <path d="M2 12l10 5 10-5" />
-                    </svg>
-                </div>
-                <span class="logo-text">GS Retail</span>
+<body
+    class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-300">
+    <header class="max-w-[1400px] mx-auto px-6 py-8 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div
+                class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_20px_rgba(0,242,254,0.3)]">
+                <span class="material-icons-round text-slate-950">dashboard</span>
             </div>
-            <div class="connection-status" id="connectionStatus">
-                <span class="status-dot"></span>
-                <span class="status-text">Frånkopplad</span>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">GS Retail</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">Analytics Pro
+                </p>
             </div>
-        </header>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Analytics Summary -->
-            <section class="panel analytics-panel">
-                <div class="panel-header">
-                    <h2>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
-                            <path d="M22 12A10 10 0 0 0 12 2v10z" />
-                        </svg>
-                        Analys & Översikt
-                    </h2>
-                    <div class="header-actions">
-                        <button class="btn btn-icon btn-sm" id="refreshBtn" title="Uppdatera data">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M23 4v6h-6" />
-                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                            </svg>
-                        </button>
+        </div>
+        <div class="flex items-center gap-4">
+            <div id="connectionStatus"
+                class="flex items-center gap-2 px-3 py-1.5 bg-accent-green/10 border border-accent-green/20 rounded-full">
+                <span class="w-2 h-2 rounded-full bg-accent-green animate-pulse"></span>
+                <span class="text-xs font-semibold text-accent-green uppercase tracking-wider status-text">Ansluten</span>
+            </div>
+            <button class="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors">
+                <span class="material-icons-round text-slate-500">settings</span>
+            </button>
+        </div>
+    </header>
+    <main class="max-w-[1400px] mx-auto px-6 pb-12">
+        <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-3">
+                <span class="material-icons-round text-primary">analytics</span>
+                <h2 class="text-2xl font-semibold">Analys &amp; Översikt</h2>
+            </div>
+            <button id="refreshBtn"
+                class="flex items-center gap-2 px-4 py-2 bg-slate-200 dark:bg-card-dark border border-slate-300 dark:border-slate-800 hover:border-primary/50 transition-all rounded-lg">
+                <span class="material-icons-round text-sm animate-spin-slow">refresh</span>
+                <span class="text-sm font-medium">Uppdatera data</span>
+            </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div
+                class="relative overflow-hidden bg-white dark:bg-card-dark p-8 rounded-2xl border border-slate-200 dark:border-slate-800 group">
+                <div class="absolute top-0 left-0 w-1 h-full bg-accent-green shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+                </div>
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-widest mb-1">
+                            Totalt In</p>
+                        <h3 id="totalIn"
+                            class="text-5xl font-bold text-accent-green glow-number group-hover:scale-110 transition-transform duration-500 origin-left">
+                            0</h3>
+                    </div>
+                    <span class="material-icons-round text-accent-green/20 text-4xl">login</span>
+                </div>
+            </div>
+            <div
+                class="relative overflow-hidden bg-white dark:bg-card-dark p-8 rounded-2xl border border-slate-200 dark:border-slate-800 group">
+                <div class="absolute top-0 left-0 w-1 h-full bg-accent-red shadow-[0_0_15px_rgba(239,68,68,0.5)]"></div>
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-widest mb-1">
+                            Totalt Ut</p>
+                        <h3 id="totalOut"
+                            class="text-5xl font-bold text-accent-red glow-number group-hover:scale-110 transition-transform duration-500 origin-left">
+                            0</h3>
+                    </div>
+                    <span class="material-icons-round text-accent-red/20 text-4xl">logout</span>
+                </div>
+            </div>
+            <div
+                class="relative overflow-hidden bg-white dark:bg-card-dark p-8 rounded-2xl border border-slate-200 dark:border-slate-800 group">
+                <div class="absolute top-0 left-0 w-1 h-full bg-accent-purple shadow-[0_0_15px_rgba(139,92,246,0.5)]">
+                </div>
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-widest mb-1">
+                            Nuvarande</p>
+                        <h3 id="occupancy"
+                            class="text-5xl font-bold text-accent-purple glow-number group-hover:scale-110 transition-transform duration-500 origin-left">
+                            0</h3>
+                    </div>
+                    <span class="material-icons-round text-accent-purple/20 text-4xl">groups</span>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800">
+                <div class="flex items-center justify-between mb-8">
+                    <h4 class="font-semibold text-slate-700 dark:text-slate-300">Besöksflöde (Sista 24h)</h4>
+                    <div class="flex items-center gap-4 text-xs font-medium">
+                        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-accent-green"></span>
+                            IN</div>
+                        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-accent-red"></span>
+                            UT</div>
                     </div>
                 </div>
-                <div class="panel-body">
-                    <div class="stats-bar analytics-stats">
-                        <div class="stat-item in-stat">
-                            <span class="stat-icon">📥</span>
-                            <div class="stat-info">
-                                <span class="stat-value" id="totalIn">0</span>
-                                <span class="stat-label">Totalt In</span>
-                            </div>
+                <!-- Canvas replaced SVG for dynamic chart -->
+                <div class="h-64 relative w-full">
+                    <canvas id="flowChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white dark:bg-card-dark p-6 rounded-2xl border border-slate-200 dark:border-slate-800">
+                <div class="flex items-center justify-between mb-8">
+                    <h4 class="font-semibold text-slate-700 dark:text-slate-300">Timvis Fördelning</h4>
+                </div>
+                <!-- Canvas replaced static bars for dynamic chart -->
+                <div class="h-64 relative w-full">
+                    <canvas id="hourlyChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div
+                class="lg:col-span-2 bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="material-icons-round text-primary">history</span>
+                        <h4 class="font-semibold text-slate-700 dark:text-slate-300">Loggade Händelser</h4>
+                    </div>
+                    <span class="text-xs text-slate-500 uppercase font-bold tracking-tighter">Live Feed</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left" id="countsTable">
+                        <thead>
+                            <tr
+                                class="text-[10px] uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                                <th class="px-6 py-4 font-bold">Tid</th>
+                                <th class="px-6 py-4 font-bold">Riktning</th>
+                                <th class="px-6 py-4 font-bold text-right">Antal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="countsBody" class="divide-y divide-slate-50 dark:divide-slate-800/50">
+                            <!-- JS will populate rows here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div
+                class="bg-white dark:bg-card-dark rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
+                <div
+                    class="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/20">
+                    <div class="flex items-center gap-2">
+                        <span class="material-icons-round text-primary text-xl">sensors</span>
+                        <h4 class="font-semibold text-slate-700 dark:text-slate-300">Realtid (MQTT)</h4>
+                    </div>
+                    <button id="clearBtn" class="text-slate-400 hover:text-accent-red transition-colors">
+                        <span class="material-icons-round text-xl">delete_outline</span>
+                    </button>
+                </div>
+                <div class="p-6 flex-grow flex flex-col">
+                    <div class="mb-6">
+                        <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider mb-2">
+                            <span>Status: Aktiv</span>
+                            <span class="text-primary"><span id="messageCount">0</span> Meddelanden</span>
                         </div>
-                        <div class="stat-item out-stat">
-                            <span class="stat-icon">📤</span>
-                            <div class="stat-info">
-                                <span class="stat-value" id="totalOut">0</span>
-                                <span class="stat-label">Totalt Ut</span>
-                            </div>
-                        </div>
-                        <div class="stat-item occupancy-stat">
-                            <span class="stat-icon">👥</span>
-                            <div class="stat-info">
-                                <span class="stat-value" id="occupancy">0</span>
-                                <span class="stat-label">Nuvarande</span>
-                            </div>
+                        <div class="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-primary w-full animate-pulse"></div>
                         </div>
                     </div>
-
-                    <div class="charts-container">
-                        <div class="chart-wrapper">
-                            <h3>Besöksflöde (Sista 24h)</h3>
-                            <canvas id="flowChart"></canvas>
-                        </div>
-                        <div class="chart-wrapper">
-                            <h3>Timvis Fördelning</h3>
-                            <canvas id="hourlyChart"></canvas>
+                    <div id="messagesContainer" class="flex-grow flex flex-col gap-2 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
+                        <div id="emptyState"
+                            class="flex-grow rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800 p-4 font-mono text-sm flex items-center justify-center">
+                            <p class="text-slate-400 animate-pulse italic">Väntar på MQTT-data...</p>
                         </div>
                     </div>
                 </div>
-            </section>
-
-            <!-- Dashboard Columns -->
-            <div class="dashboard-secondary">
-                <!-- Data Table -->
-                <section class="panel history-panel">
-                    <div class="panel-header">
-                        <h2>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Loggade Händelser
-                        </h2>
-                    </div>
-                    <div class="panel-body no-padding">
-                        <div class="table-container">
-                            <table id="countsTable">
-                                <thead>
-                                    <tr>
-                                        <th>Tid</th>
-                                        <th>Riktning</th>
-                                        <th>Antal</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="countsBody">
-                                    <!-- Rows added via JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- MQTT Console -->
-                <section class="panel messages-panel">
-                    <div class="panel-header">
-                        <div class="header-left">
-                            <h2>
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                </svg>
-                                Realitid (MQTT)
-                            </h2>
-                            <div class="message-counter">
-                                <span id="messageCount">0</span>
-                            </div>
-                        </div>
-                        <div class="header-actions">
-                            <button class="btn btn-icon btn-sm" id="clearBtn" title="Rensa">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M3 6h18" />
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="panel-body no-padding">
-                        <div class="messages-container" id="messagesContainer">
-                            <div class="empty-state" id="emptyState">
-                                <p>Väntar på MQTT-data...</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
             </div>
-        </main>
-
-        <!-- Footer -->
-        <footer class="footer">
-            <p>GS Retail Analytics &copy; 2026</p>
-        </footer>
-    </div>
-
+        </div>
+    </main>
+    <footer
+        class="max-w-[1400px] mx-auto px-6 py-8 flex items-center justify-center border-t border-slate-200 dark:border-slate-800 mt-12">
+        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
+            GS Retail Analytics © 2026 | All Rights Reserved
+        </p>
+    </footer>
+    <button
+        class="fixed bottom-6 right-6 w-12 h-12 bg-white dark:bg-card-dark rounded-full shadow-lg border border-slate-200 dark:border-slate-800 flex items-center justify-center hover:scale-110 active:scale-95 transition-all"
+        onclick="document.documentElement.classList.toggle('dark')">
+        <span class="material-icons-round dark:hidden text-slate-700">dark_mode</span>
+        <span class="material-icons-round hidden dark:block text-yellow-400">light_mode</span>
+    </button>
+    
     <!-- Paho MQTT Client -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
     <script src="app.js"></script>

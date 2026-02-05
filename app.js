@@ -18,6 +18,8 @@ const MQTT_CONFIG = {
 // DOM Elements
 const elements = {
     connectionStatus: document.getElementById('connectionStatus'),
+    statusText: document.querySelector('#connectionStatus .status-text'),
+    statusDot: document.querySelector('#connectionStatus span:first-child'),
     messagesContainer: document.getElementById('messagesContainer'),
     emptyState: document.getElementById('emptyState'),
     messageCount: document.getElementById('messageCount'),
@@ -102,11 +104,20 @@ function updateTable(counts) {
     elements.countsBody.innerHTML = '';
     counts.slice(0, 10).forEach(row => {
         const tr = document.createElement('tr');
-        const dirLabel = row.direction === 'in' ? '🟢 IN' : '🔴 UT';
+        tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors";
+        
+        const isIn = row.direction === 'in';
+        const badgeColor = isIn ? 'accent-green' : 'accent-red';
+        const label = isIn ? 'IN' : 'UT';
+
         tr.innerHTML = `
-            <td>${row.timestamp}</td>
-            <td class="dir-${row.direction}">${dirLabel}</td>
-            <td>${row.count}</td>
+            <td class="px-6 py-5 text-sm font-mono text-slate-500 dark:text-slate-400">${row.timestamp}</td>
+            <td class="px-6 py-5">
+                <div class="flex items-center gap-2 text-${badgeColor} font-bold text-xs">
+                    <span class="w-2 h-2 rounded-full bg-${badgeColor}"></span> ${label}
+                </div>
+            </td>
+            <td class="px-6 py-5 text-right font-bold">${row.count}</td>
         `;
         elements.countsBody.appendChild(tr);
     });
@@ -130,6 +141,12 @@ function renderCharts(data) {
         return found ? found.count : 0;
     });
 
+    // Chart Colors
+    const green = '#10B981';
+    const red = '#EF4444';
+    const greenFade = 'rgba(16, 185, 129, 0.1)';
+    const redFade = 'rgba(239, 68, 68, 0.1)';
+
     // Flow Chart (Line)
     if (flowChart) flowChart.destroy();
     flowChart = new Chart(ctxFlow, {
@@ -140,18 +157,22 @@ function renderCharts(data) {
                 {
                     label: 'In',
                     data: inData,
-                    borderColor: '#00ff88',
-                    backgroundColor: 'rgba(0, 255, 136, 0.1)',
+                    borderColor: green,
+                    backgroundColor: greenFade,
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 4
                 },
                 {
                     label: 'Ut',
                     data: outData,
-                    borderColor: '#ff4757',
-                    backgroundColor: 'rgba(255, 71, 87, 0.1)',
+                    borderColor: red,
+                    backgroundColor: redFade,
                     fill: true,
-                    tension: 0.4
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 4
                 }
             ]
         },
@@ -168,12 +189,14 @@ function renderCharts(data) {
                 {
                     label: 'In',
                     data: inData,
-                    backgroundColor: '#00ff88'
+                    backgroundColor: green,
+                    borderRadius: 4
                 },
                 {
                     label: 'Ut',
                     data: outData,
-                    backgroundColor: '#ff4757'
+                    backgroundColor: red,
+                    borderRadius: 4
                 }
             ]
         },
@@ -186,18 +209,33 @@ const chartOptions = {
     maintainAspectRatio: false,
     plugins: {
         legend: {
-            labels: { color: 'rgba(255, 255, 255, 0.7)' }
+            display: false // Using custom legend in UI
         }
+    },
+    interaction: {
+        mode: 'index',
+        intersect: false,
     },
     scales: {
         y: {
             beginAtZero: true,
-            grid: { color: 'rgba(255, 255, 255, 0.1)' },
-            ticks: { color: 'rgba(255, 255, 255, 0.5)' }
+            grid: { 
+                color: 'rgba(148, 163, 184, 0.1)',
+                drawBorder: false 
+            },
+            ticks: { 
+                color: '#94a3b8',
+                font: { family: 'Inter' }
+            },
+            border: { display: false }
         },
         x: {
             grid: { display: false },
-            ticks: { color: 'rgba(255, 255, 255, 0.5)' }
+            ticks: { 
+                color: '#94a3b8',
+                font: { family: 'Inter' }
+            },
+            border: { display: false }
         }
     }
 };
@@ -210,7 +248,7 @@ function connectMQTT() {
     client.onMessageArrived = onMessageArrived;
     client.onConnectionLost = (responseObject) => {
         console.error('MQTT Lost:', responseObject.errorMessage);
-        updateConnectionStatus('disconnected');
+        updateConnectionStatus(false);
     };
 
     client.connect({
@@ -221,12 +259,12 @@ function connectMQTT() {
         reconnect: true,
         onSuccess: () => {
             console.log('MQTT Connected');
-            updateConnectionStatus('connected');
+            updateConnectionStatus(true);
             client.subscribe(MQTT_CONFIG.topic);
         },
         onFailure: (err) => {
             console.error('MQTT Failed:', err);
-            updateConnectionStatus('disconnected');
+            updateConnectionStatus(false);
         }
     });
 }
@@ -237,51 +275,79 @@ function onMessageArrived(message) {
     if (elements.emptyState) elements.emptyState.style.display = 'none';
 
     const card = document.createElement('div');
-    card.className = 'message-card';
+    // Tailwind classes for message card
+    card.className = 'w-full bg-slate-50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800 rounded-lg p-3 flex items-center justify-between animate-[slideIn_0.3s_ease-out] hover:bg-slate-100 dark:hover:bg-slate-800/40 transition-colors cursor-default';
+    
     const timestamp = new Date().toLocaleTimeString('sv-SE');
 
     try {
         const data = JSON.parse(message.payloadString);
         const dir = data.Data?.Direction || 'unknown';
         const cnt = data.Data?.Count || 0;
+        const isIn = dir === 'in';
+        
+        const iconColor = isIn ? 'text-accent-green' : 'text-accent-red';
+        const iconName = isIn ? 'login' : 'logout';
+        const countColor = isIn ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-red/10 text-accent-red';
 
         card.innerHTML = `
-            <div class="status-indicator ${dir === 'in' ? 'state-true' : 'state-false'}"></div>
-            <div class="event-info">
-                <span class="event-source">Line Crossing</span>
-                <span class="event-type">${dir.toUpperCase()}</span>
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full ${countColor} flex items-center justify-center">
+                    <span class="material-icons-round text-sm">${iconName}</span>
+                </div>
+                <div>
+                    <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Line Crossing
+                    </h5>
+                    <p class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                        ${timestamp}
+                    </p>
+                </div>
             </div>
-            <span class="state-badge active">${cnt}st</span>
-            <span class="message-time">${timestamp}</span>
+            <div class="flex flex-col items-end">
+                <span class="text-xs font-bold ${iconColor} uppercase tracking-wider">
+                    ${dir.toUpperCase()}
+                </span>
+                <span class="text-[10px] font-mono text-slate-400">
+                    #${cnt}
+                </span>
+            </div>
         `;
 
         // Refresh API data when new MQTT message arrives to keep charts updated
         refreshData();
     } catch (e) {
-        card.innerHTML = `<pre>${message.payloadString}</pre>`;
+        card.innerHTML = `<pre class="text-xs text-red-500">${message.payloadString}</pre>`;
     }
 
     elements.messagesContainer.insertBefore(card, elements.messagesContainer.firstChild);
-    const cards = elements.messagesContainer.querySelectorAll('.message-card');
-    if (cards.length > 20) cards[cards.length - 1].remove();
+    // Limit to 50 messages
+    const cards = elements.messagesContainer.querySelectorAll('div[class*="w-full"]');
+    if (cards.length > 50) cards[cards.length - 1].remove();
 }
 
-function updateConnectionStatus(status) {
-    elements.connectionStatus.className = 'connection-status ' + (status === 'connected' ? 'connected' : '');
-    elements.connectionStatus.querySelector('.status-text').textContent = status === 'connected' ? 'Ansluten' : 'Frånkopplad';
+function updateConnectionStatus(connected) {
+    if (connected) {
+        elements.connectionStatus.className = 'flex items-center gap-2 px-3 py-1.5 bg-accent-green/10 border border-accent-green/20 rounded-full';
+        elements.statusDot.className = 'w-2 h-2 rounded-full bg-accent-green animate-pulse';
+        elements.statusText.className = 'text-xs font-semibold text-accent-green uppercase tracking-wider status-text';
+        elements.statusText.textContent = 'Ansluten';
+    } else {
+        elements.connectionStatus.className = 'flex items-center gap-2 px-3 py-1.5 bg-accent-red/10 border border-accent-red/20 rounded-full';
+        elements.statusDot.className = 'w-2 h-2 rounded-full bg-accent-red';
+        elements.statusText.className = 'text-xs font-semibold text-accent-red uppercase tracking-wider status-text';
+        elements.statusText.textContent = 'Frånkopplad';
+    }
 }
 
 function clearMessages() {
     messageCounter = 0;
     elements.messageCount.textContent = '0';
-    elements.messagesContainer.innerHTML = '';
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    // Remove all message cards but keep empty state
+    const cards = elements.messagesContainer.querySelectorAll('div[class*="w-full"]');
+    cards.forEach(card => card.remove());
+    
+    if (elements.emptyState) elements.emptyState.style.display = 'flex';
 }
 
 document.addEventListener('DOMContentLoaded', init);
-

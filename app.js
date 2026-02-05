@@ -126,121 +126,140 @@ function updateTable(counts) {
 }
 
 /**
- * Render Chart.js diagrams
+ * Render ApexCharts diagrams
  */
 function renderCharts(data) {
-    const ctxFlow = document.getElementById('flowChart').getContext('2d');
-    const ctxHourly = document.getElementById('hourlyChart').getContext('2d');
-
-    // Process Hourly Data
-    const labels = [...new Set(data.hourly.map(d => d.hour.split(' ')[1].substring(0, 5)))];
-    const inData = labels.map(label => {
-        const found = data.hourly.find(d => d.hour.includes(label) && d.direction === 'in');
-        return found ? found.count : 0;
-    });
-    const outData = labels.map(label => {
-        const found = data.hourly.find(d => d.hour.includes(label) && d.direction === 'out');
-        return found ? found.count : 0;
-    });
-
-    // Chart Colors
-    const green = '#10B981';
-    const red = '#EF4444';
-    const greenFade = 'rgba(16, 185, 129, 0.1)';
-    const redFade = 'rgba(239, 68, 68, 0.1)';
-
-    // Flow Chart (Line)
-    if (flowChart) flowChart.destroy();
-    flowChart = new Chart(ctxFlow, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'In',
-                    data: inData,
-                    borderColor: green,
-                    backgroundColor: greenFade,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    pointHoverRadius: 4
-                },
-                {
-                    label: 'Ut',
-                    data: outData,
-                    borderColor: red,
-                    backgroundColor: redFade,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 0,
-                    pointHoverRadius: 4
-                }
-            ]
-        },
-        options: chartOptions
-    });
-
-    // Hourly Chart (Bar)
-    if (hourlyChart) hourlyChart.destroy();
-    hourlyChart = new Chart(ctxHourly, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'In',
-                    data: inData,
-                    backgroundColor: green,
-                    borderRadius: 4
-                },
-                {
-                    label: 'Ut',
-                    data: outData,
-                    backgroundColor: red,
-                    borderRadius: 4
-                }
-            ]
-        },
-        options: chartOptions
-    });
-}
-
-const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-        legend: {
-            display: false // Using custom legend in UI
-        }
-    },
-    interaction: {
-        mode: 'index',
-        intersect: false,
-    },
-    scales: {
-        y: {
-            beginAtZero: true,
-            grid: {
-                color: 'rgba(148, 163, 184, 0.1)',
-                drawBorder: false
-            },
-            ticks: {
-                color: '#94a3b8',
-                font: { family: 'Inter' }
-            },
-            border: { display: false }
-        },
-        x: {
-            grid: { display: false },
-            ticks: {
-                color: '#94a3b8',
-                font: { family: 'Inter' }
-            },
-            border: { display: false }
-        }
+    // Process Hourly Data for labels (00:00 - 23:00)
+    const allHours = [];
+    for (let i = 0; i < 24; i++) {
+        allHours.push(String(i).padStart(2, '0') + ':00');
     }
-};
+
+    // Create a map of hourly data
+    const hourlyMap = {};
+    data.hourly.forEach(d => {
+        const hourPart = d.hour.split(' ')[1]?.substring(0, 5) || d.hour.substring(0, 5);
+        if (!hourlyMap[hourPart]) {
+            hourlyMap[hourPart] = { in: 0, out: 0 };
+        }
+        if (d.direction === 'in') hourlyMap[hourPart].in += d.count;
+        if (d.direction === 'out') hourlyMap[hourPart].out += d.count;
+    });
+
+    // Generate data arrays
+    const inData = allHours.map(h => hourlyMap[h]?.in || 0);
+    const outData = allHours.map(h => hourlyMap[h]?.out || 0);
+    const totalData = allHours.map((h, i) => inData[i] + outData[i]);
+
+    // Update Min/Max display
+    const maxVal = Math.max(...totalData);
+    const minVal = Math.min(...totalData.filter(v => v > 0), 0); // Find min > 0
+    const maxHour = allHours[totalData.indexOf(maxVal)];
+    const minHour = allHours[totalData.indexOf(minVal === Infinity ? 0 : minVal)];
+
+    const hourlyMaxEl = document.getElementById('hourlyMax');
+    const hourlyMinEl = document.getElementById('hourlyMin');
+    if (hourlyMaxEl) hourlyMaxEl.textContent = `${maxVal} (kl ${maxHour?.substring(0, 2) || '?'})`;
+    if (hourlyMinEl) hourlyMinEl.textContent = `${minVal === Infinity ? 0 : minVal} (kl ${minHour?.substring(0, 2) || '?'})`;
+
+    // Theme colors
+    const purple = '#8B5CF6';
+    const purpleLight = '#C4B5FD';
+    const isDark = document.documentElement.classList.contains('dark');
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)';
+
+    // --- Hourly Bar Chart (Dygnsvy) ---
+    if (hourlyChart) hourlyChart.destroy();
+    hourlyChart = new ApexCharts(document.getElementById('hourlyChart'), {
+        chart: {
+            type: 'bar',
+            height: '100%',
+            fontFamily: 'Inter, sans-serif',
+            toolbar: { show: false },
+            animations: { enabled: true, speed: 500 }
+        },
+        series: [{
+            name: 'Antal händelser',
+            data: totalData
+        }],
+        colors: [purple],
+        plotOptions: {
+            bar: {
+                borderRadius: 4,
+                columnWidth: '70%',
+                dataLabels: { position: 'top' }
+            }
+        },
+        dataLabels: {
+            enabled: true,
+            offsetY: -20,
+            style: { fontSize: '10px', colors: [textColor] }
+        },
+        xaxis: {
+            categories: allHours,
+            labels: { style: { colors: textColor, fontSize: '10px' } },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+        },
+        yaxis: {
+            labels: { style: { colors: textColor } }
+        },
+        grid: {
+            borderColor: gridColor,
+            strokeDashArray: 4
+        },
+        tooltip: {
+            theme: isDark ? 'dark' : 'light'
+        }
+    });
+    hourlyChart.render();
+
+    // --- Flow Area Chart (Besöksflöde) ---
+    if (flowChart) flowChart.destroy();
+    flowChart = new ApexCharts(document.getElementById('flowChart'), {
+        chart: {
+            type: 'area',
+            height: '100%',
+            fontFamily: 'Inter, sans-serif',
+            toolbar: { show: false },
+            animations: { enabled: true, speed: 500 }
+        },
+        series: [
+            { name: 'IN', data: inData },
+            { name: 'UT', data: outData }
+        ],
+        colors: [purple, purpleLight],
+        stroke: { curve: 'smooth', width: 2 },
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shadeIntensity: 1,
+                opacityFrom: 0.4,
+                opacityTo: 0.1,
+                stops: [0, 90, 100]
+            }
+        },
+        xaxis: {
+            categories: allHours,
+            labels: { style: { colors: textColor, fontSize: '10px' } },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+        },
+        yaxis: {
+            labels: { style: { colors: textColor } }
+        },
+        grid: {
+            borderColor: gridColor,
+            strokeDashArray: 4
+        },
+        legend: { show: false },
+        tooltip: {
+            theme: isDark ? 'dark' : 'light'
+        }
+    });
+    flowChart.render();
+}
 
 /**
  * Setup MQTT Connection

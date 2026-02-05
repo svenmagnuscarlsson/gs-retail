@@ -4,12 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="GS Retail MQTT Sensor Monitor - Real-time sensor data visualization">
-    <title>GS Retail | MQTT Sensor Monitor</title>
+    <meta name="description" content="GS Retail People Counting Dashboard - Analytics and Real-time Monitoring">
+    <title>GS Retail | People Counting Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -34,143 +36,131 @@
 
         <!-- Main Content -->
         <main class="main-content">
-            <!-- Connection Panel -->
-            <section class="panel connection-panel">
+            <!-- Analytics Summary -->
+            <section class="panel analytics-panel">
                 <div class="panel-header">
                     <h2>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-                            <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-                            <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-                            <circle cx="12" cy="20" r="1" />
+                            <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+                            <path d="M22 12A10 10 0 0 0 12 2v10z" />
                         </svg>
-                        MQTT Anslutning
+                        Analys & Översikt
                     </h2>
-                </div>
-                <div class="panel-body">
-                    <div class="connection-info">
-                        <div class="info-row">
-                            <span class="info-label">Broker:</span>
-                            <span class="info-value" id="brokerInfo">wss://mqtt.swedeniot.se:9001/ws</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">Topic:</span>
-                            <span class="info-value topic-badge">gs-retail/sensor/onvif-ej/#</span>
-                        </div>
-                    </div>
-                    <div class="button-group">
-                        <button class="btn btn-primary" id="connectBtn">
+                    <div class="header-actions">
+                        <button class="btn btn-icon btn-sm" id="refreshBtn" title="Uppdatera data">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M5 12h14" />
-                                <path d="M12 5l7 7-7 7" />
+                                <path d="M23 4v6h-6" />
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                             </svg>
-                            Anslut
-                        </button>
-                        <button class="btn btn-secondary" id="disconnectBtn" disabled>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="18" y1="6" x2="6" y2="18" />
-                                <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                            Koppla från
                         </button>
                     </div>
                 </div>
-            </section>
-
-            <!-- Sensor Dashboard -->
-            <section class="panel sensor-dashboard">
-                <div class="panel-header">
-                    <h2>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="3" width="7" height="7" rx="1" />
-                            <rect x="14" y="3" width="7" height="7" rx="1" />
-                            <rect x="3" y="14" width="7" height="7" rx="1" />
-                            <rect x="14" y="14" width="7" height="7" rx="1" />
-                        </svg>
-                        Sensor Dashboard
-                    </h2>
-                </div>
                 <div class="panel-body">
-                    <!-- Stats Bar -->
-                    <div class="stats-bar">
-                        <div class="stat-item">
-                            <span class="stat-icon">📹</span>
-                            <span class="stat-value" id="sensorCount">0</span>
-                            <span class="stat-label">Sensorer</span>
+                    <div class="stats-bar analytics-stats">
+                        <div class="stat-item in-stat">
+                            <span class="stat-icon">📥</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="totalIn">0</span>
+                                <span class="stat-label">Totalt In</span>
+                            </div>
                         </div>
-                        <div class="stat-item">
-                            <span class="stat-icon">🎯</span>
-                            <span class="stat-value" id="motionCount">0</span>
-                            <span class="stat-label">Motion Events</span>
+                        <div class="stat-item out-stat">
+                            <span class="stat-icon">📤</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="totalOut">0</span>
+                                <span class="stat-label">Totalt Ut</span>
+                            </div>
                         </div>
-                        <div class="stat-item person-stat">
-                            <span class="stat-icon">👤</span>
-                            <span class="stat-value" id="personCount">0</span>
-                            <span class="stat-label">Personer</span>
+                        <div class="stat-item occupancy-stat">
+                            <span class="stat-icon">👥</span>
+                            <div class="stat-info">
+                                <span class="stat-value" id="occupancy">0</span>
+                                <span class="stat-label">Nuvarande</span>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Sensor Grid -->
-                    <div class="sensor-grid" id="sensorGrid">
-                        <div class="empty-sensors" id="emptySensors">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <rect x="3" y="3" width="7" height="7" rx="1" />
-                                <rect x="14" y="3" width="7" height="7" rx="1" />
-                                <rect x="3" y="14" width="7" height="7" rx="1" />
-                                <rect x="14" y="14" width="7" height="7" rx="1" />
-                            </svg>
-                            <p>Inga sensorer upptäckta</p>
-                            <span>Anslut till MQTT för att se aktiva sensorer</span>
+                    <div class="charts-container">
+                        <div class="chart-wrapper">
+                            <h3>Besöksflöde (Sista 24h)</h3>
+                            <canvas id="flowChart"></canvas>
+                        </div>
+                        <div class="chart-wrapper">
+                            <h3>Timvis Fördelning</h3>
+                            <canvas id="hourlyChart"></canvas>
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Messages Panel -->
-            <section class="panel messages-panel">
-                <div class="panel-header">
-                    <div class="header-left">
+            <!-- Dashboard Columns -->
+            <div class="dashboard-secondary">
+                <!-- Data Table -->
+                <section class="panel history-panel">
+                    <div class="panel-header">
                         <h2>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            Meddelanden
+                            Loggade Händelser
                         </h2>
-                        <div class="message-counter">
-                            <span id="messageCount">0</span>
+                    </div>
+                    <div class="panel-body no-padding">
+                        <div class="table-container">
+                            <table id="countsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Tid</th>
+                                        <th>Riktning</th>
+                                        <th>Antal</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="countsBody">
+                                    <!-- Rows added via JS -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
+                </section>
 
-                    <div class="header-actions">
-                        <button class="btn btn-icon btn-sm" id="clearBtn" title="Rensa meddelanden">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 6h18" />
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="panel-body no-padding">
-                    <div class="messages-container" id="messagesContainer">
-                        <div class="empty-state" id="emptyState">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                                <path d="M8 10h.01" />
-                                <path d="M12 10h.01" />
-                                <path d="M16 10h.01" />
-                            </svg>
-                            <p>Inga meddelanden ännu</p>
-                            <span>Anslut till brokern för att börja ta emot data</span>
+                <!-- MQTT Console -->
+                <section class="panel messages-panel">
+                    <div class="panel-header">
+                        <div class="header-left">
+                            <h2>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                </svg>
+                                Realitid (MQTT)
+                            </h2>
+                            <div class="message-counter">
+                                <span id="messageCount">0</span>
+                            </div>
+                        </div>
+                        <div class="header-actions">
+                            <button class="btn btn-icon btn-sm" id="clearBtn" title="Rensa">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18" />
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
-                </div>
-            </section>
+                    <div class="panel-body no-padding">
+                        <div class="messages-container" id="messagesContainer">
+                            <div class="empty-state" id="emptyState">
+                                <p>Väntar på MQTT-data...</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
         </main>
 
         <!-- Footer -->
         <footer class="footer">
-            <p>GS Retail Sensor Monitor &copy; 2026</p>
+            <p>GS Retail Analytics &copy; 2026</p>
         </footer>
     </div>
 

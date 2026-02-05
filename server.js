@@ -5,16 +5,17 @@ const express = require('express');
 
 // Configuration
 const MQTT_CONFIG = {
-    host: 'mqtt.swedeniot.se',
-    port: 9001,
-    protocol: 'wss',
-    path: '/ws',
-    username: 'maca',
-    password: 'maca2025',
-    topic: 'gs-retail/sensor/onvif-ej/PeopleCounting/PeopleCountPunctual/&VideoEncoderToken-01-0/line2'
+    host: process.env.MQTT_HOST || 'mqtt.swedeniot.se',
+    port: parseInt(process.env.MQTT_PORT || '9001'),
+    protocol: process.env.MQTT_PROTOCOL || 'wss',
+    path: process.env.MQTT_PATH || '/ws',
+    username: process.env.MQTT_USERNAME || 'maca',
+    password: process.env.MQTT_PASSWORD || 'maca2025',
+    topic: process.env.MQTT_TOPIC || 'gs-retail/sensor/onvif-ej/PeopleCounting/PeopleCountPunctual/&VideoEncoderToken-01-0/line2'
 };
 
-const DB_PATH = path.join(__dirname, 'people_counting.db');
+// Use /data for Railway Volume, fallback to local path for development
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'people_counting.db');
 const PORT = process.env.PORT || 3000;
 
 // Database Setup

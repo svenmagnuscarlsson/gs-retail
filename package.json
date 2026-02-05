@@ -4,6 +4,7 @@
   "description": "En statisk webbapplikation för att övervaka sensordata via MQTT över WebSockets.",
   "main": "app.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

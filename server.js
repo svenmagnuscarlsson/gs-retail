@@ -82,6 +82,10 @@ app.get('/api/stats', (req, res) => {
     });
 });
 
+app.get('/api/config', (req, res) => {
+    res.json(MQTT_CONFIG);
+});
+
 // MQTT Setup
 const client = mqtt.connect(`${MQTT_CONFIG.protocol}://${MQTT_CONFIG.host}:${MQTT_CONFIG.port}${MQTT_CONFIG.path}`, {
     username: MQTT_CONFIG.username,
@@ -158,4 +162,5 @@ process.on('SIGINT', () => {
         process.exit(0);
     });
 });
+
 

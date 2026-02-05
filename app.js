@@ -4,16 +4,7 @@
  */
 
 // MQTT Configuration
-const MQTT_CONFIG = {
-    host: 'mqtt.swedeniot.se',
-    port: 9001,
-    path: '/ws',
-    useSSL: true,
-    username: 'maca',
-    password: 'maca2025',
-    topic: 'gs-retail/sensor/onvif-ej/PeopleCounting/PeopleCountPunctual/&VideoEncoderToken-01-0/line2',
-    clientId: 'gs-retail-web-' + Math.random().toString(16).substring(2, 10)
-};
+let MQTT_CONFIG = null;
 
 // DOM Elements
 const elements = {
@@ -47,16 +38,27 @@ async function init() {
     elements.clearBtn.addEventListener('click', clearMessages);
     elements.refreshBtn.addEventListener('click', refreshData);
 
-    // Initial Data Fetch
-    await refreshData();
+    try {
+        // Fetch Configuration
+        const configRes = await fetch('/api/config');
+        MQTT_CONFIG = await configRes.json();
 
-    // Setup MQTT
-    connectMQTT();
+        // Add unique client ID for browser session
+        MQTT_CONFIG.clientId = 'gs-retail-web-' + Math.random().toString(16).substring(2, 10);
 
-    // Auto-refresh data every 60 seconds
-    setInterval(refreshData, 60000);
+        // Initial Data Fetch
+        await refreshData();
 
-    console.log('GS Retail Dashboard initialized');
+        // Setup MQTT
+        connectMQTT();
+
+        // Auto-refresh data every 60 seconds
+        setInterval(refreshData, 60000);
+
+        console.log('GS Retail Dashboard initialized');
+    } catch (err) {
+        console.error('Initialization failed:', err);
+    }
 }
 
 /**
@@ -105,7 +107,7 @@ function updateTable(counts) {
     counts.slice(0, 10).forEach(row => {
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors";
-        
+
         const isIn = row.direction === 'in';
         const badgeColor = isIn ? 'accent-green' : 'accent-red';
         const label = isIn ? 'IN' : 'UT';
@@ -219,11 +221,11 @@ const chartOptions = {
     scales: {
         y: {
             beginAtZero: true,
-            grid: { 
+            grid: {
                 color: 'rgba(148, 163, 184, 0.1)',
-                drawBorder: false 
+                drawBorder: false
             },
-            ticks: { 
+            ticks: {
                 color: '#94a3b8',
                 font: { family: 'Inter' }
             },
@@ -231,7 +233,7 @@ const chartOptions = {
         },
         x: {
             grid: { display: false },
-            ticks: { 
+            ticks: {
                 color: '#94a3b8',
                 font: { family: 'Inter' }
             },
@@ -277,7 +279,7 @@ function onMessageArrived(message) {
     const card = document.createElement('div');
     // Tailwind classes for message card
     card.className = 'w-full bg-slate-50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800 rounded-lg p-3 flex items-center justify-between animate-[slideIn_0.3s_ease-out] hover:bg-slate-100 dark:hover:bg-slate-800/40 transition-colors cursor-default';
-    
+
     const timestamp = new Date().toLocaleTimeString('sv-SE');
 
     try {
@@ -285,7 +287,7 @@ function onMessageArrived(message) {
         const dir = data.Data?.Direction || 'unknown';
         const cnt = data.Data?.Count || 0;
         const isIn = dir === 'in';
-        
+
         const iconColor = isIn ? 'text-accent-green' : 'text-accent-red';
         const iconName = isIn ? 'login' : 'logout';
         const countColor = isIn ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-red/10 text-accent-red';
@@ -346,7 +348,7 @@ function clearMessages() {
     // Remove all message cards but keep empty state
     const cards = elements.messagesContainer.querySelectorAll('div[class*="w-full"]');
     cards.forEach(card => card.remove());
-    
+
     if (elements.emptyState) elements.emptyState.style.display = 'flex';
 }
 

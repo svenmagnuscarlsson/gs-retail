@@ -9,7 +9,9 @@ const MQTT_CONFIG = {
     port: parseInt(process.env.MQTT_PORT || '9001'),
     protocol: process.env.MQTT_PROTOCOL || 'wss',
     path: process.env.MQTT_PATH || '/ws',
+    useSSL: (process.env.MQTT_PROTOCOL || 'wss') === 'wss',
     username: process.env.MQTT_USERNAME || 'maca',
+
     password: process.env.MQTT_PASSWORD || 'maca2025',
     topic: process.env.MQTT_TOPIC || 'gs-retail/sensor/onvif-ej/PeopleCounting/PeopleCountPunctual/&VideoEncoderToken-01-0/line2'
 };

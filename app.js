@@ -1,5 +1,5 @@
 /**
- * GS Retail People Counting Dashboard
+ * Personräkning v1.0
  * Visualizes data from SQLite via API and real-time MQTT
  */
 
@@ -10,33 +10,53 @@ let MQTT_CONFIG = null;
 const elements = {
     connectionStatus: document.getElementById('connectionStatus'),
     statusText: document.querySelector('#connectionStatus .status-text'),
-    statusDot: document.querySelector('#connectionStatus span:first-child'),
-    messagesContainer: document.getElementById('messagesContainer'),
+    statusDot: document.querySelector('#connectionStatus .status-dot'),
+    liveLogContainer: document.getElementById('liveLogContainer'),
     emptyState: document.getElementById('emptyState'),
-    messageCount: document.getElementById('messageCount'),
-    clearBtn: document.getElementById('clearBtn'),
-    refreshBtn: document.getElementById('refreshBtn'),
     // Stats
     totalIn: document.getElementById('totalIn'),
     totalOut: document.getElementById('totalOut'),
     occupancy: document.getElementById('occupancy'),
-    // Table
-    countsBody: document.getElementById('countsBody')
+    // Tabs
+    tabOperations: document.getElementById('tabOperations'),
+    tabAnalytics: document.getElementById('tabAnalytics'),
+    operationsView: document.getElementById('operationsView'),
+    analyticsView: document.getElementById('analyticsView'),
+    // Tables
+    fullEventsList: document.getElementById('fullEventsList'),
+    // Links
+    showAllHistory: document.getElementById('showAllHistory'),
+    // Filters
+    timeFilter: document.getElementById('timeFilter')
 };
 
 // State
 let client = null;
 let messageCounter = 0;
-let flowChart = null;
 let hourlyChart = null;
+let heatmapChart = null;
+let allCounts = []; // Store all counts for full event list
 
 /**
  * Initialize the application
  */
 async function init() {
     // Event Listeners
-    elements.clearBtn.addEventListener('click', clearMessages);
-    elements.refreshBtn.addEventListener('click', refreshData);
+    setupTabNavigation();
+
+    if (elements.showAllHistory) {
+        elements.showAllHistory.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchToAnalytics();
+        });
+    }
+
+    // Time filter event listener
+    if (elements.timeFilter) {
+        elements.timeFilter.addEventListener('change', () => {
+            refreshData();
+        });
+    }
 
     try {
         // Fetch Configuration
@@ -55,10 +75,35 @@ async function init() {
         // Auto-refresh data every 60 seconds
         setInterval(refreshData, 60000);
 
-        console.log('GS Retail Dashboard initialized');
+        console.log('Personräkning Dashboard initialized');
     } catch (err) {
         console.error('Initialization failed:', err);
     }
+}
+
+/**
+ * Setup tab navigation
+ */
+function setupTabNavigation() {
+    elements.tabOperations.addEventListener('click', () => {
+        elements.tabOperations.classList.add('active');
+        elements.tabAnalytics.classList.remove('active');
+        elements.operationsView.style.display = 'block';
+        elements.analyticsView.style.display = 'none';
+    });
+
+    elements.tabAnalytics.addEventListener('click', () => {
+        elements.tabAnalytics.classList.add('active');
+        elements.tabOperations.classList.remove('active');
+        elements.analyticsView.style.display = 'block';
+        elements.operationsView.style.display = 'none';
+        // Render heatmap when switching to analytics
+        renderHeatmap();
+    });
+}
+
+function switchToAnalytics() {
+    elements.tabAnalytics.click();
 }
 
 /**
@@ -74,9 +119,12 @@ async function refreshData() {
         const counts = await countsRes.json();
         const stats = await statsRes.json();
 
+        allCounts = counts; // Store for full event list
+
         updateStats(stats.summary);
-        updateTable(counts);
-        renderCharts(stats);
+        updateLiveLog(counts);
+        updateFullEventsList(counts);
+        renderHourlyChart(stats);
     } catch (err) {
         console.error('Error refreshing data:', err);
     }
@@ -100,39 +148,84 @@ function updateStats(summary) {
 }
 
 /**
- * Update recent events table
+ * Update Live Log panel
  */
-function updateTable(counts) {
-    elements.countsBody.innerHTML = '';
-    counts.slice(0, 10).forEach(row => {
-        const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors";
+function updateLiveLog(counts) {
+    // Keep empty state handling
+    if (counts.length === 0) {
+        if (elements.emptyState) elements.emptyState.style.display = 'flex';
+        return;
+    }
 
+    if (elements.emptyState) elements.emptyState.style.display = 'none';
+
+    // Clear existing items (except empty state)
+    const existingItems = elements.liveLogContainer.querySelectorAll('.livelog-item');
+    existingItems.forEach(item => item.remove());
+
+    // Add recent events (limit to 6)
+    counts.slice(0, 6).forEach((row, index) => {
         const isIn = row.direction === 'in';
-        const badgeColor = isIn ? 'accent-green' : 'accent-red';
-        const label = isIn ? 'IN' : 'UT';
+        const item = document.createElement('div');
+        item.className = 'livelog-item';
 
-        tr.innerHTML = `
-            <td class="px-6 py-5 text-sm font-mono text-slate-500 dark:text-slate-400">${row.timestamp}</td>
-            <td class="px-6 py-5">
-                <div class="flex items-center gap-2 text-${badgeColor} font-bold text-xs">
-                    <span class="w-2 h-2 rounded-full bg-${badgeColor}"></span> ${label}
-                </div>
-            </td>
-            <td class="px-6 py-5 text-right font-bold">${row.count}</td>
+        const iconClass = isIn ? 'livelog-icon-in' : 'livelog-icon-out';
+        const direction = isIn ? 'Inpassage' : 'Utpassage';
+        const arrowSvg = isIn
+            ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>`
+            : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="7" x2="17" y2="17"></line><polyline points="17 7 17 17 7 17"></polyline></svg>`;
+
+        // Extract time from timestamp
+        const timePart = row.timestamp.split(' ')[1] || row.timestamp;
+
+        item.innerHTML = `
+            <div class="livelog-icon ${iconClass}">
+                ${arrowSvg}
+            </div>
+            <div class="livelog-info">
+                <p class="livelog-time">${timePart}</p>
+                <p class="livelog-direction">${direction}</p>
+            </div>
+            <span class="livelog-id">#${counts.length - index}</span>
         `;
-        elements.countsBody.appendChild(tr);
+
+        elements.liveLogContainer.appendChild(item);
     });
 }
 
 /**
- * Render ApexCharts diagrams
+ * Update Full Events List (Analytics view)
  */
-function renderCharts(data) {
-    // Process Hourly Data for labels (00:00 - 23:00)
-    const allHours = [];
-    for (let i = 0; i < 24; i++) {
-        allHours.push(String(i).padStart(2, '0') + ':00');
+function updateFullEventsList(counts) {
+    elements.fullEventsList.innerHTML = '';
+
+    counts.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        const isIn = row.direction === 'in';
+        const badgeClass = isIn ? 'direction-badge-in' : 'direction-badge-out';
+        const label = isIn ? 'IN' : 'OUT';
+        const arrowSvg = isIn
+            ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>`
+            : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="7" x2="17" y2="17"></line><polyline points="17 7 17 17 7 17"></polyline></svg>`;
+
+        tr.innerHTML = `
+            <td><a href="#" class="id-link">#${counts.length - index}</a></td>
+            <td>${row.timestamp}</td>
+            <td><span class="direction-badge ${badgeClass}">${arrowSvg} ${label}</span></td>
+            <td class="text-right"><span class="count-value">${row.count}</span></td>
+        `;
+        elements.fullEventsList.appendChild(tr);
+    });
+}
+
+/**
+ * Render Hourly Bar Chart (ApexCharts)
+ */
+function renderHourlyChart(data) {
+    // Process Hourly Data for labels (05:00 - 18:00 for display, but show all available hours)
+    const displayHours = [];
+    for (let i = 5; i <= 21; i++) {
+        displayHours.push(String(i).padStart(2, '0') + ':00');
     }
 
     // Create a map of hourly data
@@ -146,119 +239,177 @@ function renderCharts(data) {
         if (d.direction === 'out') hourlyMap[hourPart].out += d.count;
     });
 
-    // Generate data arrays
-    const inData = allHours.map(h => hourlyMap[h]?.in || 0);
-    const outData = allHours.map(h => hourlyMap[h]?.out || 0);
-    const totalData = allHours.map((h, i) => inData[i] + outData[i]);
+    // Generate data arrays for display hours
+    const totalData = displayHours.map(h => {
+        const hourData = hourlyMap[h];
+        return hourData ? hourData.in + hourData.out : 0;
+    });
 
-    // Update Min/Max display
-    const maxVal = Math.max(...totalData);
-    const minVal = Math.min(...totalData.filter(v => v > 0), 0); // Find min > 0
-    const maxHour = allHours[totalData.indexOf(maxVal)];
-    const minHour = allHours[totalData.indexOf(minVal === Infinity ? 0 : minVal)];
+    // Chart colors
+    const chartBlue = '#93c5fd';
+    const textColor = '#64748b';
+    const gridColor = 'rgba(226, 232, 240, 0.5)';
 
-    const hourlyMaxEl = document.getElementById('hourlyMax');
-    const hourlyMinEl = document.getElementById('hourlyMin');
-    if (hourlyMaxEl) hourlyMaxEl.textContent = `${maxVal} (kl ${maxHour?.substring(0, 2) || '?'})`;
-    if (hourlyMinEl) hourlyMinEl.textContent = `${minVal === Infinity ? 0 : minVal} (kl ${minHour?.substring(0, 2) || '?'})`;
-
-    // Theme colors
-    const purple = '#8B5CF6';
-    const purpleLight = '#C4B5FD';
-    const isDark = document.documentElement.classList.contains('dark');
-    const textColor = isDark ? '#94a3b8' : '#64748b';
-    const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)';
-
-    // --- Hourly Bar Chart (Dygnsvy) ---
+    // Destroy existing chart
     if (hourlyChart) hourlyChart.destroy();
+
     hourlyChart = new ApexCharts(document.getElementById('hourlyChart'), {
         chart: {
             type: 'bar',
-            height: '100%',
+            height: 400,
             fontFamily: 'Inter, sans-serif',
             toolbar: { show: false },
             animations: { enabled: true, speed: 500 }
         },
         series: [{
-            name: 'Antal händelser',
+            name: 'Antal',
             data: totalData
         }],
-        colors: [purple],
+        colors: [chartBlue],
         plotOptions: {
             bar: {
                 borderRadius: 4,
-                columnWidth: '70%',
-                dataLabels: { position: 'top' }
+                columnWidth: '60%',
             }
         },
         dataLabels: {
-            enabled: true,
-            offsetY: -20,
-            style: { fontSize: '10px', colors: [textColor] }
+            enabled: false
         },
         xaxis: {
-            categories: allHours,
-            labels: { style: { colors: textColor, fontSize: '10px' } },
-            axisBorder: { show: false },
-            axisTicks: { show: false }
+            categories: displayHours,
+            labels: {
+                style: { colors: textColor, fontSize: '11px' },
+                rotate: -45,
+                rotateAlways: false,
+                hideOverlappingLabels: true,
+                trim: false
+            },
+            axisBorder: { show: true, color: gridColor },
+            axisTicks: { show: true, color: gridColor }
         },
         yaxis: {
-            labels: { style: { colors: textColor } }
+            labels: {
+                style: { colors: textColor, fontSize: '11px' },
+                formatter: (val) => Math.round(val)
+            }
         },
         grid: {
             borderColor: gridColor,
-            strokeDashArray: 4
+            strokeDashArray: 0,
+            xaxis: { lines: { show: false } },
+            padding: {
+                bottom: 20
+            }
         },
         tooltip: {
-            theme: isDark ? 'dark' : 'light'
+            theme: 'light',
+            y: {
+                formatter: (val) => val + ' händelser'
+            }
         }
     });
     hourlyChart.render();
+}
 
-    // --- Flow Area Chart (Besöksflöde) ---
-    if (flowChart) flowChart.destroy();
-    flowChart = new ApexCharts(document.getElementById('flowChart'), {
-        chart: {
-            type: 'area',
-            height: '100%',
-            fontFamily: 'Inter, sans-serif',
-            toolbar: { show: false },
-            animations: { enabled: true, speed: 500 }
-        },
-        series: [
-            { name: 'IN', data: inData },
-            { name: 'UT', data: outData }
-        ],
-        colors: [purple, purpleLight],
-        stroke: { curve: 'smooth', width: 2 },
-        fill: {
-            type: 'gradient',
-            gradient: {
-                shadeIntensity: 1,
-                opacityFrom: 0.4,
-                opacityTo: 0.1,
-                stops: [0, 90, 100]
+/**
+ * Render Heatmap Chart (ApexCharts)
+ */
+async function renderHeatmap() {
+    // Days of week (SQLite: 0=Sunday, 1=Monday, ..., 6=Saturday)
+    // We want to display: Mån, Tis, Ons, Tor, Fre, Lör, Sön
+    const dayNames = ['Sön', 'Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör'];
+    const displayDays = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
+
+    // Hours from 05:00 to 18:00
+    const hours = [];
+    for (let i = 5; i <= 18; i++) {
+        hours.push(i);
+    }
+
+    try {
+        // Fetch real data from API
+        const response = await fetch('/api/heatmap');
+        const data = await response.json();
+
+        // Create a map for quick lookup: key = "day_hour", value = total
+        const dataMap = {};
+        data.forEach(row => {
+            const key = `${row.day_of_week}_${row.hour}`;
+            dataMap[key] = row.total;
+        });
+
+        // Build series data for ApexCharts heatmap
+        const series = hours.map(hour => {
+            return {
+                name: String(hour).padStart(2, '0') + ':00',
+                data: displayDays.map((dayName, idx) => {
+                    // Convert display day index to SQLite day_of_week
+                    // displayDays: 0=Mån, 1=Tis, ..., 6=Sön
+                    // SQLite: 0=Sön, 1=Mån, ..., 6=Lör
+                    const sqliteDayIndex = idx === 6 ? 0 : idx + 1;
+                    const key = `${sqliteDayIndex}_${hour}`;
+                    return {
+                        x: dayName,
+                        y: dataMap[key] || 0
+                    };
+                })
+            };
+        });
+
+        // Chart colors
+        const textColor = '#64748b';
+
+        // Destroy existing chart
+        if (heatmapChart) heatmapChart.destroy();
+
+        heatmapChart = new ApexCharts(document.getElementById('heatmapChart'), {
+            chart: {
+                type: 'heatmap',
+                height: 320,
+                fontFamily: 'Inter, sans-serif',
+                toolbar: { show: false }
+            },
+            series: series,
+            colors: ['#1d4ed8'],
+            plotOptions: {
+                heatmap: {
+                    shadeIntensity: 0.5,
+                    radius: 4,
+                    enableShades: true,
+                    colorScale: {
+                        ranges: [
+                            { from: 0, to: 3, color: '#dbeafe', name: 'Låg' },
+                            { from: 4, to: 6, color: '#93c5fd', name: 'Medel' },
+                            { from: 7, to: 10, color: '#3b82f6', name: 'Hög' },
+                            { from: 11, to: 15, color: '#1d4ed8', name: 'Mycket hög' }
+                        ]
+                    }
+                }
+            },
+            dataLabels: {
+                enabled: false
+            },
+            xaxis: {
+                labels: {
+                    style: { colors: textColor, fontSize: '12px', fontWeight: 500 }
+                }
+            },
+            yaxis: {
+                labels: {
+                    style: { colors: textColor, fontSize: '11px' }
+                }
+            },
+            legend: {
+                show: false
+            },
+            tooltip: {
+                theme: 'light'
             }
-        },
-        xaxis: {
-            categories: allHours,
-            labels: { style: { colors: textColor, fontSize: '10px' } },
-            axisBorder: { show: false },
-            axisTicks: { show: false }
-        },
-        yaxis: {
-            labels: { style: { colors: textColor } }
-        },
-        grid: {
-            borderColor: gridColor,
-            strokeDashArray: 4
-        },
-        legend: { show: false },
-        tooltip: {
-            theme: isDark ? 'dark' : 'light'
-        }
-    });
-    flowChart.render();
+        });
+        heatmapChart.render();
+    } catch (err) {
+        console.error('Error loading heatmap data:', err);
+    }
 }
 
 /**
@@ -292,14 +443,7 @@ function connectMQTT() {
 
 function onMessageArrived(message) {
     messageCounter++;
-    elements.messageCount.textContent = messageCounter;
     if (elements.emptyState) elements.emptyState.style.display = 'none';
-
-    const card = document.createElement('div');
-    // Tailwind classes for message card
-    card.className = 'w-full bg-slate-50 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800 rounded-lg p-3 flex items-center justify-between animate-[slideIn_0.3s_ease-out] hover:bg-slate-100 dark:hover:bg-slate-800/40 transition-colors cursor-default';
-
-    const timestamp = new Date().toLocaleTimeString('sv-SE');
 
     try {
         const data = JSON.parse(message.payloadString);
@@ -307,68 +451,56 @@ function onMessageArrived(message) {
         const cnt = data.Data?.Count || 0;
         const isIn = dir === 'in';
 
-        const iconColor = isIn ? 'text-accent-green' : 'text-accent-red';
-        const iconName = isIn ? 'login' : 'logout';
-        const countColor = isIn ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-red/10 text-accent-red';
+        // Create new live log item
+        const item = document.createElement('div');
+        item.className = 'livelog-item';
 
-        card.innerHTML = `
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-full ${countColor} flex items-center justify-center">
-                    <span class="material-icons-round text-sm">${iconName}</span>
-                </div>
-                <div>
-                    <h5 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                        Line Crossing
-                    </h5>
-                    <p class="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
-                        ${timestamp}
-                    </p>
-                </div>
+        const iconClass = isIn ? 'livelog-icon-in' : 'livelog-icon-out';
+        const direction = isIn ? 'Inpassage' : 'Utpassage';
+        const arrowSvg = isIn
+            ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>`
+            : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="7" x2="17" y2="17"></line><polyline points="17 7 17 17 7 17"></polyline></svg>`;
+
+        const timestamp = new Date().toLocaleTimeString('sv-SE');
+
+        item.innerHTML = `
+            <div class="livelog-icon ${iconClass}">
+                ${arrowSvg}
             </div>
-            <div class="flex flex-col items-end">
-                <span class="text-xs font-bold ${iconColor} uppercase tracking-wider">
-                    ${dir.toUpperCase()}
-                </span>
-                <span class="text-[10px] font-mono text-slate-400">
-                    #${cnt}
-                </span>
+            <div class="livelog-info">
+                <p class="livelog-time">${timestamp}</p>
+                <p class="livelog-direction">${direction}</p>
             </div>
+            <span class="livelog-id">#${messageCounter}</span>
         `;
+
+        // Insert at beginning of container, after empty state
+        const firstItem = elements.liveLogContainer.querySelector('.livelog-item');
+        if (firstItem) {
+            elements.liveLogContainer.insertBefore(item, firstItem);
+        } else {
+            elements.liveLogContainer.appendChild(item);
+        }
+
+        // Limit to 10 items
+        const items = elements.liveLogContainer.querySelectorAll('.livelog-item');
+        if (items.length > 10) items[items.length - 1].remove();
 
         // Refresh API data when new MQTT message arrives to keep charts updated
         refreshData();
     } catch (e) {
-        card.innerHTML = `<pre class="text-xs text-red-500">${message.payloadString}</pre>`;
+        console.error('Error parsing MQTT message:', e);
     }
-
-    elements.messagesContainer.insertBefore(card, elements.messagesContainer.firstChild);
-    // Limit to 50 messages
-    const cards = elements.messagesContainer.querySelectorAll('div[class*="w-full"]');
-    if (cards.length > 50) cards[cards.length - 1].remove();
 }
 
 function updateConnectionStatus(connected) {
     if (connected) {
-        elements.connectionStatus.className = 'flex items-center gap-2 px-3 py-1.5 bg-accent-green/10 border border-accent-green/20 rounded-full';
-        elements.statusDot.className = 'w-2 h-2 rounded-full bg-accent-green animate-pulse';
-        elements.statusText.className = 'text-xs font-semibold text-accent-green uppercase tracking-wider status-text';
-        elements.statusText.textContent = 'Ansluten';
+        elements.connectionStatus.className = 'connection-status connected';
+        if (elements.statusText) elements.statusText.textContent = 'Ansluten';
     } else {
-        elements.connectionStatus.className = 'flex items-center gap-2 px-3 py-1.5 bg-accent-red/10 border border-accent-red/20 rounded-full';
-        elements.statusDot.className = 'w-2 h-2 rounded-full bg-accent-red';
-        elements.statusText.className = 'text-xs font-semibold text-accent-red uppercase tracking-wider status-text';
-        elements.statusText.textContent = 'Frånkopplad';
+        elements.connectionStatus.className = 'connection-status disconnected';
+        if (elements.statusText) elements.statusText.textContent = 'Frånkopplad';
     }
-}
-
-function clearMessages() {
-    messageCounter = 0;
-    elements.messageCount.textContent = '0';
-    // Remove all message cards but keep empty state
-    const cards = elements.messagesContainer.querySelectorAll('div[class*="w-full"]');
-    cards.forEach(card => card.remove());
-
-    if (elements.emptyState) elements.emptyState.style.display = 'flex';
 }
 
 document.addEventListener('DOMContentLoaded', init);

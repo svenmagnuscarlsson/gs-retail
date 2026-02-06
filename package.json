@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/svenmagnuscarlsson/gs-retail#readme",
   "dependencies": {
+    "dotenv": "^17.2.4",
     "express": "^5.2.1",
     "mqtt": "^5.15.0",
     "sqlite3": "^5.1.7"

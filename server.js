@@ -1,20 +1,30 @@
+require('dotenv').config();
+
 const mqtt = require('mqtt');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const express = require('express');
 
-// Configuration
+// Configuration - sensitive values MUST be set via environment variables
 const MQTT_CONFIG = {
-    host: process.env.MQTT_HOST || 'mqtt.swedeniot.se',
+    host: process.env.MQTT_HOST,
     port: parseInt(process.env.MQTT_PORT || '9001'),
     protocol: process.env.MQTT_PROTOCOL || 'wss',
     path: process.env.MQTT_PATH || '/ws',
     useSSL: (process.env.MQTT_PROTOCOL || 'wss') === 'wss',
-    username: process.env.MQTT_USERNAME || 'maca',
-
-    password: process.env.MQTT_PASSWORD || 'maca2025',
-    topic: process.env.MQTT_TOPIC || 'gs-retail/sensor/onvif-ej/PeopleCounting/PeopleCountPunctual/&VideoEncoderToken-01-0/line2'
+    username: process.env.MQTT_USERNAME,
+    password: process.env.MQTT_PASSWORD,
+    topic: process.env.MQTT_TOPIC
 };
+
+// Validate required environment variables
+const requiredEnvVars = ['MQTT_HOST', 'MQTT_USERNAME', 'MQTT_PASSWORD', 'MQTT_TOPIC'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingEnvVars.length > 0) {
+    console.error(`❌ Missing required environment variables: ${missingEnvVars.join(', ')}`);
+    console.error('Please create a .env file based on .env.example');
+    process.exit(1);
+}
 
 // Use /data for Railway Volume, fallback to local path for development
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'people_counting.db');
@@ -86,6 +96,24 @@ app.get('/api/stats', (req, res) => {
 
 app.get('/api/config', (req, res) => {
     res.json(MQTT_CONFIG);
+});
+
+// Heatmap data - weekly view grouped by day of week and hour
+app.get('/api/heatmap', (req, res) => {
+    const heatmapQuery = `
+        SELECT 
+            CAST(strftime('%w', timestamp) AS INTEGER) as day_of_week,
+            CAST(strftime('%H', timestamp) AS INTEGER) as hour,
+            SUM(count) as total
+        FROM counts 
+        WHERE strftime('%H', timestamp) >= '05' AND strftime('%H', timestamp) <= '18'
+        GROUP BY day_of_week, hour
+        ORDER BY day_of_week, hour`;
+
+    db.all(heatmapQuery, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
 });
 
 // MQTT Setup
